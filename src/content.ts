@@ -1,10 +1,12 @@
 import { extractConversation } from './lib/extract';
 import { buildMarkdown, sanitizeFilename } from './lib/markdown';
 import {
+  getPanelCopy,
   panelMarkup,
   renderStatus,
+  resolveLocale,
   resolveTheme,
-  STATUS_SUBTITLE,
+  type PanelLocale,
   type PanelTheme,
   type StatusState,
 } from './lib/panel';
@@ -19,6 +21,7 @@ interface ExportUi {
   label: HTMLElement;
   subtitle: HTMLElement;
   status: HTMLElement;
+  locale: PanelLocale;
 }
 
 function installExporter(): void {
@@ -27,7 +30,8 @@ function installExporter(): void {
   const host = document.createElement('div');
   host.id = HOST_ID;
   const shadow = host.attachShadow({ mode: 'open' });
-  shadow.innerHTML = panelMarkup(resolveTheme(document));
+  const locale = resolveLocale(navigator);
+  shadow.innerHTML = panelMarkup(resolveTheme(document), locale);
   document.documentElement.append(host);
 
   const root = shadow.querySelector<HTMLElement>('[data-export-root]');
@@ -43,22 +47,24 @@ function installExporter(): void {
 
   watchTheme(document, (theme) => root.setAttribute('data-theme', theme));
 
-  const ui: ExportUi = { button, label, subtitle, status };
+  const ui: ExportUi = { button, label, subtitle, status, locale };
   tab.addEventListener('click', () => panel.toggleAttribute('data-open'));
   close.addEventListener('click', () => panel.removeAttribute('data-open'));
   button.addEventListener('click', () => void runExport(ui));
 }
 
 function setStatus(ui: ExportUi, state: StatusState): void {
-  ui.subtitle.textContent = STATUS_SUBTITLE[state.kind];
-  ui.status.innerHTML = renderStatus(state);
+  const copy = getPanelCopy(ui.locale);
+  ui.subtitle.textContent = copy.subtitle[state.kind];
+  ui.status.innerHTML = renderStatus(state, ui.locale);
   const busy = state.kind === 'progress';
   ui.button.toggleAttribute('data-busy', busy);
   ui.button.disabled = busy;
-  ui.label.textContent = busy ? '読み込み中…' : 'この会話を .md 保存';
+  ui.label.textContent = busy ? copy.busyLabel : copy.buttonLabel;
 }
 
 async function runExport(ui: ExportUi): Promise<void> {
+  const copy = getPanelCopy(ui.locale);
   setStatus(ui, { kind: 'progress', messageCount: 0, iteration: 0 });
 
   try {
@@ -72,7 +78,7 @@ async function runExport(ui: ExportUi): Promise<void> {
 
     const conversation = extractConversation(document);
     if (conversation.messages.length === 0) {
-      throw new Error('ChatGPTの会話メッセージを検出できませんでした。');
+      throw new Error(copy.defaultEmptyError);
     }
 
     const markdown = buildMarkdown({
@@ -90,7 +96,7 @@ async function runExport(ui: ExportUi): Promise<void> {
       filename,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'エクスポートに失敗しました。';
+    const message = error instanceof Error ? error.message : copy.defaultUnknownError;
     setStatus(ui, { kind: 'error', message });
   }
 }

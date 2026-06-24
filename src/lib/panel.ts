@@ -1,4 +1,5 @@
 export type PanelTheme = 'light' | 'dark';
+export type PanelLocale = 'en' | 'ja';
 
 export type StatusState =
   | { kind: 'idle' }
@@ -6,12 +7,85 @@ export type StatusState =
   | { kind: 'success'; messageCount: number; filename: string }
   | { kind: 'error'; message: string };
 
-export const STATUS_SUBTITLE: Record<StatusState['kind'], string> = {
-  idle: 'この会話をローカルに保存',
-  progress: '古い会話を読み込み中…',
-  success: '保存しました',
-  error: '失敗しました',
+interface NavigatorLanguageLike {
+  language?: string;
+  languages?: readonly string[];
+}
+
+interface PanelCopy {
+  subtitle: Record<StatusState['kind'], string>;
+  tabLabel: string;
+  openAria: string;
+  closeAria: string;
+  buttonLabel: string;
+  busyLabel: string;
+  footer: string;
+  idleHint: string;
+  progressText: (messageCount: number, iteration: number) => string;
+  successBadge: string;
+  successDetail: (messageCount: number) => string;
+  defaultEmptyError: string;
+  defaultUnknownError: string;
+}
+
+const PANEL_COPY: Record<PanelLocale, PanelCopy> = {
+  en: {
+    subtitle: {
+      idle: 'Save this conversation locally',
+      progress: 'Loading older messages…',
+      success: 'Saved',
+      error: 'Failed',
+    },
+    tabLabel: 'Save as .md',
+    openAria: 'Open ChatGPT Markdown Exporter',
+    closeAria: 'Close',
+    buttonLabel: 'Save this conversation as .md',
+    busyLabel: 'Loading…',
+    footer: 'No external transmission — extracted from this page and saved locally',
+    idleHint:
+      'Press the button to auto-scroll to the top and export all loaded turns as Markdown.',
+    progressText: (messageCount, iteration) =>
+      `${messageCount} messages found / ${iteration} scrolls`,
+    successBadge: '✓ Saved',
+    successDetail: (messageCount) => `${messageCount} messages exported to Markdown`,
+    defaultEmptyError: 'Could not detect ChatGPT conversation messages.',
+    defaultUnknownError: 'Export failed.',
+  },
+  ja: {
+    subtitle: {
+      idle: 'この会話をローカルに保存',
+      progress: '古い会話を読み込み中…',
+      success: '保存しました',
+      error: '失敗しました',
+    },
+    tabLabel: 'MD保存',
+    openAria: 'ChatGPT Markdown Exporter を開く',
+    closeAria: '閉じる',
+    buttonLabel: 'この会話を .md 保存',
+    busyLabel: '読み込み中…',
+    footer: '外部送信なし・ページ内DOMから抽出してローカル保存',
+    idleHint:
+      'ボタンを押すと上端まで自動スクロールし、読み込まれた全ターンを Markdown 化します。',
+    progressText: (messageCount, iteration) =>
+      `${messageCount} 件検出 / ${iteration} 回スクロール`,
+    successBadge: '✓ 保存完了',
+    successDetail: (messageCount) => `${messageCount} 件を Markdown 化`,
+    defaultEmptyError: 'ChatGPTの会話メッセージを検出できませんでした。',
+    defaultUnknownError: 'エクスポートに失敗しました。',
+  },
 };
+
+export const STATUS_SUBTITLE: Record<StatusState['kind'], string> = PANEL_COPY.ja.subtitle;
+
+export function getPanelCopy(locale: PanelLocale = 'ja'): PanelCopy {
+  return PANEL_COPY[locale];
+}
+
+export function resolveLocale(source: NavigatorLanguageLike = globalThis.navigator): PanelLocale {
+  const candidates = source.languages?.length ? source.languages : [source.language];
+  const normalized = candidates.find((language): language is string => Boolean(language))?.toLowerCase();
+  return normalized?.startsWith('ja') ? 'ja' : 'en';
+}
 
 /**
  * Decide the panel theme by following ChatGPT's active appearance, falling back
@@ -49,14 +123,15 @@ function escapeHtml(value: string): string {
 }
 
 /** Inner HTML for the status region; pure for unit testing. */
-export function renderStatus(state: StatusState): string {
+export function renderStatus(state: StatusState, locale: PanelLocale = 'ja'): string {
+  const copy = getPanelCopy(locale);
   switch (state.kind) {
     case 'idle':
-      return `<div class="well"><div class="well__row"><span class="dot dot--muted"></span><span>ボタンを押すと上端まで自動スクロールし、読み込まれた全ターンを Markdown 化します。</span></div></div>`;
+      return `<div class="well"><div class="well__row"><span class="dot dot--muted"></span><span>${copy.idleHint}</span></div></div>`;
     case 'progress':
-      return `<div class="well"><div class="progress"><i></i></div><div class="well__row"><span class="dot dot--accent"></span><span>${state.messageCount} 件検出 / ${state.iteration} 回スクロール</span></div></div>`;
+      return `<div class="well"><div class="progress"><i></i></div><div class="well__row"><span class="dot dot--accent"></span><span>${copy.progressText(state.messageCount, state.iteration)}</span></div></div>`;
     case 'success':
-      return `<div class="well"><div class="well__row"><span class="badge badge--success">✓ 保存完了</span><span>${state.messageCount} 件を Markdown 化</span></div><div class="filename">${escapeHtml(state.filename)}</div></div>`;
+      return `<div class="well"><div class="well__row"><span class="badge badge--success">${copy.successBadge}</span><span>${copy.successDetail(state.messageCount)}</span></div><div class="filename">${escapeHtml(state.filename)}</div></div>`;
     case 'error':
       return `<div class="alert" role="alert"><span class="badge badge--danger">!</span><span>${escapeHtml(state.message)}</span></div>`;
     default: {
@@ -178,30 +253,31 @@ const ICON_SPINNER = `<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="
 const ICON_SHIELD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v6c0 4 3 6.5 7 9 4-2.5 7-5 7-9V6l-7-3Z"/></svg>`;
 
 /** Full shadow-DOM markup for the launcher tab + panel. */
-export function panelMarkup(theme: PanelTheme = 'light'): string {
+export function panelMarkup(theme: PanelTheme = 'light', locale: PanelLocale = 'ja'): string {
+  const copy = getPanelCopy(locale);
   return `
     <style>${panelStyles()}</style>
-    <div class="root" data-export-root data-theme="${theme}">
-      <button class="tab" type="button" data-export-tab aria-label="ChatGPT Markdown Exporter を開く">
-        <span class="glyph">↓</span>MD保存
+    <div class="root" data-export-root data-theme="${theme}" lang="${locale}">
+      <button class="tab" type="button" data-export-tab aria-label="${copy.openAria}">
+        <span class="glyph">↓</span>${copy.tabLabel}
       </button>
       <aside class="card" data-export-panel role="dialog" aria-label="ChatGPT Markdown Exporter">
         <div class="card__head">
           <div class="brand" aria-hidden="true">M↓</div>
           <div class="head__text">
             <span class="title">ChatGPT → Markdown</span>
-            <span class="subtitle" data-export-subtitle>${STATUS_SUBTITLE.idle}</span>
+            <span class="subtitle" data-export-subtitle>${copy.subtitle.idle}</span>
           </div>
-          <button class="close" type="button" data-export-close aria-label="閉じる">×</button>
+          <button class="close" type="button" data-export-close aria-label="${copy.closeAria}">×</button>
         </div>
         <div class="card__body">
           <button class="primary" type="button" data-export-button>
             <span class="ic ic-dl">${ICON_DOWNLOAD}</span>
             <span class="ic ic-sp">${ICON_SPINNER}</span>
-            <span data-export-label>この会話を .md 保存</span>
+            <span data-export-label>${copy.buttonLabel}</span>
           </button>
-          <div data-export-status aria-live="polite">${renderStatus({ kind: 'idle' })}</div>
-          <p class="foot">${ICON_SHIELD}<span>外部送信なし・ページ内DOMから抽出してローカル保存</span></p>
+          <div data-export-status aria-live="polite">${renderStatus({ kind: 'idle' }, locale)}</div>
+          <p class="foot">${ICON_SHIELD}<span>${copy.footer}</span></p>
         </div>
       </aside>
     </div>
