@@ -1,6 +1,6 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
-import { selectBestScroller } from '../src/lib/scroll';
+import { hydrateConversationHistory, selectBestScroller } from '../src/lib/scroll';
 
 function setMetrics(element: Element, metrics: { scrollHeight: number; clientHeight: number }): void {
   Object.defineProperties(element, {
@@ -54,5 +54,72 @@ describe('selectBestScroller', () => {
 
     expect(selectBestScroller(document)).toBe(conversation);
   });
+});
 
+describe('hydrateConversationHistory', () => {
+  it('reports incomplete when the safety limit is reached before history is stable', async () => {
+    const dom = new JSDOM(
+      `
+      <main>
+        <section id="conversation">
+          <div data-message-author-role="user">hello</div>
+          <div data-message-author-role="assistant">hi</div>
+        </section>
+      </main>
+    `,
+      { url: 'https://chatgpt.com/c/test' },
+    );
+    const document = dom.window.document;
+    const conversation = document.querySelector('#conversation')!;
+    setMetrics(conversation, { scrollHeight: 2_000, clientHeight: 500 });
+
+    const progress: number[] = [];
+    const result = await hydrateConversationHistory(
+      document,
+      ({ iteration }) => progress.push(iteration),
+      { maxIterations: 2, settleMs: 0, stableIterations: 99 },
+    );
+
+    expect(progress).toEqual([1, 2]);
+    expect(result).toEqual({
+      completed: false,
+      reachedLimit: true,
+      iterations: 2,
+      messageCount: 2,
+      atTop: true,
+      maxIterations: 2,
+    });
+  });
+
+  it('reports complete after the conversation is stable at the top', async () => {
+    const dom = new JSDOM(
+      `
+      <main>
+        <section id="conversation">
+          <div data-message-author-role="user">hello</div>
+          <div data-message-author-role="assistant">hi</div>
+        </section>
+      </main>
+    `,
+      { url: 'https://chatgpt.com/c/test' },
+    );
+    const document = dom.window.document;
+    const conversation = document.querySelector('#conversation')!;
+    setMetrics(conversation, { scrollHeight: 2_000, clientHeight: 500 });
+
+    const result = await hydrateConversationHistory(document, undefined, {
+      maxIterations: 5,
+      settleMs: 0,
+      stableIterations: 1,
+    });
+
+    expect(result).toEqual({
+      completed: true,
+      reachedLimit: false,
+      iterations: 2,
+      messageCount: 2,
+      atTop: true,
+      maxIterations: 5,
+    });
+  });
 });

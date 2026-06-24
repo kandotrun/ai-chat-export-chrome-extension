@@ -2,10 +2,27 @@ import { CONVERSATION_TURN_SELECTOR } from './extract';
 
 const TURN_SELECTOR = CONVERSATION_TURN_SELECTOR;
 
+export const DEFAULT_MAX_SCROLL_ITERATIONS = 300;
+
 export interface BackfillProgress {
   iteration: number;
   messageCount: number;
   atTop: boolean;
+}
+
+export interface BackfillResult {
+  completed: boolean;
+  reachedLimit: boolean;
+  iterations: number;
+  messageCount: number;
+  atTop: boolean;
+  maxIterations: number;
+}
+
+interface HydrateOptions {
+  maxIterations?: number;
+  settleMs?: number;
+  stableIterations?: number;
 }
 
 export type ScrollTarget = Element | Window;
@@ -13,14 +30,19 @@ export type ScrollTarget = Element | Window;
 export async function hydrateConversationHistory(
   document: Document,
   onProgress: (progress: BackfillProgress) => void = () => undefined,
-  options: { maxIterations?: number; settleMs?: number; stableIterations?: number } = {},
-): Promise<void> {
-  const maxIterations = options.maxIterations ?? 80;
+  options: HydrateOptions = {},
+): Promise<BackfillResult> {
+  const maxIterations = options.maxIterations ?? DEFAULT_MAX_SCROLL_ITERATIONS;
   const settleMs = options.settleMs ?? 650;
   const stableIterations = options.stableIterations ?? 3;
   const scroller = selectBestScroller(document);
   let stable = 0;
   let previousSignature = '';
+  let lastProgress: BackfillProgress = {
+    iteration: 0,
+    messageCount: conversationSignature(document).messageCount,
+    atTop: isAtTop(scroller),
+  };
 
   for (let iteration = 1; iteration <= maxIterations; iteration += 1) {
     const before = conversationSignature(document);
@@ -30,7 +52,8 @@ export async function hydrateConversationHistory(
     const atTop = isAtTop(scroller);
     const signature = `${after.messageCount}:${after.firstMessage}:${after.lastMessage}:${atTop}`;
 
-    onProgress({ iteration, messageCount: after.messageCount, atTop });
+    lastProgress = { iteration, messageCount: after.messageCount, atTop };
+    onProgress(lastProgress);
 
     if (atTop && signature === previousSignature && before.messageCount === after.messageCount) {
       stable += 1;
@@ -39,8 +62,26 @@ export async function hydrateConversationHistory(
     }
 
     previousSignature = signature;
-    if (stable >= stableIterations) break;
+    if (stable >= stableIterations) {
+      return {
+        completed: true,
+        reachedLimit: false,
+        iterations: iteration,
+        messageCount: lastProgress.messageCount,
+        atTop: lastProgress.atTop,
+        maxIterations,
+      };
+    }
   }
+
+  return {
+    completed: false,
+    reachedLimit: true,
+    iterations: lastProgress.iteration,
+    messageCount: lastProgress.messageCount,
+    atTop: lastProgress.atTop,
+    maxIterations,
+  };
 }
 
 export function selectBestScroller(document: Document): ScrollTarget {

@@ -68,13 +68,17 @@ async function runExport(ui: ExportUi): Promise<void> {
   setStatus(ui, { kind: 'progress', messageCount: 0, iteration: 0 });
 
   try {
-    await hydrateConversationHistory(document, (progress) => {
+    const backfill = await hydrateConversationHistory(document, (progress) => {
       setStatus(ui, {
         kind: 'progress',
         messageCount: progress.messageCount,
         iteration: progress.iteration,
       });
     });
+
+    if (!backfill.completed) {
+      throw new Error(copy.defaultIncompleteError(backfill.maxIterations));
+    }
 
     const conversation = extractConversation(document);
     if (conversation.messages.length === 0) {

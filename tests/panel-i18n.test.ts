@@ -48,4 +48,9 @@ describe('localized panel copy', () => {
       '52 messages exported to Markdown',
     );
   });
+
+  it('localizes the scroll safety-limit error', () => {
+    expect(getPanelCopy('en').defaultIncompleteError(300)).toContain('300 scroll attempts');
+    expect(getPanelCopy('ja').defaultIncompleteError(300)).toContain('300 回');
+  });
 });

@@ -24,6 +24,7 @@ interface PanelCopy {
   progressText: (messageCount: number, iteration: number) => string;
   successBadge: string;
   successDetail: (messageCount: number) => string;
+  defaultIncompleteError: (maxIterations: number) => string;
   defaultEmptyError: string;
   defaultUnknownError: string;
 }
@@ -48,6 +49,8 @@ const PANEL_COPY: Record<PanelLocale, PanelCopy> = {
       `${messageCount} messages found / ${iteration} scrolls`,
     successBadge: '✓ Saved',
     successDetail: (messageCount) => `${messageCount} messages exported to Markdown`,
+    defaultIncompleteError: (maxIterations) =>
+      `Stopped after ${maxIterations} scroll attempts before the top looked stable. Export was cancelled to avoid saving an incomplete file. Please try again after the conversation finishes loading.`,
     defaultEmptyError: 'Could not detect conversation messages.',
     defaultUnknownError: 'Export failed.',
   },
@@ -70,6 +73,8 @@ const PANEL_COPY: Record<PanelLocale, PanelCopy> = {
       `${messageCount} 件検出 / ${iteration} 回スクロール`,
     successBadge: '✓ 保存完了',
     successDetail: (messageCount) => `${messageCount} 件を Markdown 化`,
+    defaultIncompleteError: (maxIterations) =>
+      `${maxIterations} 回スクロールしても上端の安定を確認できませんでした。不完全なファイル保存を避けるため、エクスポートを中止しました。会話の読み込み完了後に再試行してください。`,
     defaultEmptyError: '会話メッセージを検出できませんでした。',
     defaultUnknownError: 'エクスポートに失敗しました。',
   },

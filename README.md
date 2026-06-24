@@ -6,6 +6,7 @@ A privacy-first Chrome extension that exports the currently opened ChatGPT, Clau
 
 - Export the current ChatGPT, Claude, or Gemini conversation as Markdown.
 - Automatically scroll upward before export so older, lazily loaded messages can be collected.
+- Cancels the export instead of saving a partial file if the page cannot confirm a stable top after the scroll safety limit.
 - Adds a small right-edge `MD Export` tab on supported AI chat pages.
 - Runs locally in the browser. No analytics, no remote server, no external API calls.
 - Minimal permissions: no `tabs`, `downloads`, browsing history, storage, or clipboard permissions.
@@ -62,6 +63,8 @@ Chrome extension permissions are intentionally empty.
 ## Known limitations
 
 ChatGPT, Claude, or Gemini may change their DOM structure. If extraction breaks, add a representative DOM snippet to `tests/extract.test.ts` first, then update the selectors / renderer.
+
+The auto-scroll pass currently uses a 300-iteration safety limit to avoid infinite loops. If that limit is reached before the top of the conversation looks stable, the extension stops with an error instead of downloading a potentially incomplete Markdown file.
 
 ## Disclaimer
 
