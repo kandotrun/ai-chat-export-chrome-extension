@@ -237,7 +237,7 @@ export function panelStyles(): string {
     .progress > i { display: block; height: 100%; width: 40%; border-radius: 999px; background-color: var(--indigo); background-image: var(--gloss); background-repeat: no-repeat; box-shadow: var(--bevel-top); animation: kan-indeterminate 1.2s ease-in-out infinite; }
     @keyframes kan-indeterminate { 0% { margin-left: -42%; } 100% { margin-left: 102%; } }
 
-    .badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 700; color: #fff; background-image: linear-gradient(to bottom, rgba(255,255,255,0.35), rgba(0,0,0,0.10)); box-shadow: var(--bevel-top), inset 0 0 0 1px rgba(0,0,0,0.12); }
+    .badge { display: inline-flex; align-items: center; gap: 5px; flex: none; white-space: nowrap; border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 700; color: #fff; background-image: linear-gradient(to bottom, rgba(255,255,255,0.35), rgba(0,0,0,0.10)); box-shadow: var(--bevel-top), inset 0 0 0 1px rgba(0,0,0,0.12); }
     .badge--success { background-color: var(--success); }
     .badge--danger { background-color: var(--danger); }
     .filename { font-family: var(--font-mono); font-size: 12px; color: var(--fg); word-break: break-all; }

@@ -97,6 +97,11 @@ describe('panelStyles', () => {
     expect(css).toContain('.progress');
   });
 
+  it('keeps status badges on a single line', () => {
+    expect(css).toMatch(/\.badge\s*\{[^}]*white-space:\s*nowrap/);
+    expect(css).toMatch(/\.badge\s*\{[^}]*flex:\s*none/);
+  });
+
   it('provides a dark theme override', () => {
     expect(css).toContain('[data-theme="dark"]');
   });
